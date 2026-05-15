@@ -22,7 +22,7 @@ App de ejemplo con notificaciones locales (heads-up style) usando Ionic 7, Angul
 
 ```bash
 # 1. Clonar el repo
-git clone <url-del-repo>
+git clone https://github.com/Juanma7882/push-notification-con-ionic-y-capacitor.git
 cd push-notification
 
 # 2. Instalar dependencias
