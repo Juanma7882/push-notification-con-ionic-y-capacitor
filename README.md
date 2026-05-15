@@ -30,8 +30,8 @@ npm install
 
 # 3. Inicializar Capacitor (solo si no existe capacitor.config.ts)
 npx cap init
-# Name: nombre-de-tu-app
-# Package ID: com.tudominio.app
+# Name: ionic-app-base
+# Package ID: com.example.app
 ```
 
 Verificar que `capacitor.config.ts` tenga `webDir: 'www'`:
@@ -47,6 +47,8 @@ const config: CapacitorConfig = {
 
 export default config;
 ```
+<img width="1934" height="769" alt="Captura de pantalla 2026-05-15 165201" src="https://github.com/user-attachments/assets/ed16ef71-9e40-4f70-b0a6-fc28f6d4036d" />
+
 
 ---
 
@@ -193,3 +195,276 @@ npx cap sync
 | `@capacitor/haptics` | 8.0.2 | Vibración |
 | `@capacitor/keyboard` | 8.0.3 | Control del teclado nativo |
 | `@capacitor/status-bar` | 8.0.2 | Control de la barra de estado |
+
+# ¿Por qué necesitamos Java?
+
+Gradle (el sistema de build de Android) tiene requisitos específicos de compatibilidad con Java.
+
+Cada versión de Gradle soporta un rango determinado de versiones de Java:
+
+| Gradle | Java mínimo | Java máximo recomendado |
+|---|---|---|
+| 8.x | Java 8 | Java 21 |
+| 7.x | Java 8 | Java 17 |
+| 6.x | Java 8 | Java 15 |
+
+En este proyecto usamos **Java 21** porque es compatible con **Gradle 8.x**, que es la versión utilizada por Capacitor moderno.
+
+Si usás Java 22, 23 o superior, el build puede fallar porque Gradle todavía no tiene soporte completo para esas versiones.
+
+---
+
+# Cadena de herramientas
+
+```text
+Android Studio
+    └── Gradle (build system)
+            └── necesita Java en un rango específico
+                    └── compila el código nativo Java/Kotlin de Capacitor
+```
+
+---
+
+# ¿Cómo interactúan Ionic, Angular y Capacitor?
+
+## Flujo general
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│                         DESARROLLO                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   Angular + Ionic    →    ionic build    →    Carpeta www/     │
+│   (TypeScript/HTML)        (compila)         (HTML/CSS/JS)     │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+                                   ↓
+┌─────────────────────────────────────────────────────────────────┐
+│                         CAPACITOR                               │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   www/    →    npx cap sync    →    android/app/src/main/assets│
+│   (web)          (copia)                     /public/           │
+│                                                                 │
+│   Capa de puente:                                               │
+│   - Expone APIs nativas (notificaciones, cámara, GPS)          │
+│   - Convierte llamadas JS → Java (Android) / Swift (iOS)       │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+                                   ↓
+┌─────────────────────────────────────────────────────────────────┐
+│                      PROYECTO NATIVO                            │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   android/                                                      │
+│   ├── app/src/main/java/    (código nativo Kotlin/Java)        │
+│   ├── app/src/main/assets/  (tu app web compilada)             │
+│   └── build.gradle          (configuración de Gradle + Java)   │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+                                   ↓
+┌─────────────────────────────────────────────────────────────────┐
+│                      ANDROID STUDIO                             │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   Gradle (Java)    →    compila    →    APK / AAB              │
+│                          (JDK)                                  │
+│                                                                 │
+│   Emulador / Dispositivo físico → App instalada corriendo      │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+# Explicación detallada
+
+## 1. Angular
+
+Angular maneja la lógica de la aplicación y la interfaz de usuario.
+
+Todo se escribe en:
+
+- TypeScript
+- HTML
+- SCSS
+
+---
+
+## 2. Ionic
+
+Ionic proporciona:
+
+- Componentes visuales (`ion-button`, `ion-toast`, etc.)
+- Estilos móviles
+- Herramientas de compilación
+
+Cuando ejecutás:
+
+```bash
+ionic build
+```
+
+Ionic:
+
+1. Ejecuta Angular CLI
+2. Compila TypeScript → JavaScript
+3. Genera archivos estáticos
+4. Guarda todo en `www/`
+
+---
+
+## 3. Capacitor
+
+Capacitor funciona como un puente entre la aplicación web y Android/iOS.
+
+### Funciones principales
+
+- Copia `www/` al proyecto Android
+- Expone APIs nativas
+- Traduce llamadas JavaScript → código nativo
+
+Ejemplo:
+
+```ts
+LocalNotifications.schedule()
+```
+
+Capacitor convierte esa llamada en código Java/Kotlin que utiliza el sistema de notificaciones de Android.
+
+### Comando importante
+
+```bash
+npx cap sync android
+```
+
+Este comando:
+
+- copia los archivos web
+- actualiza plugins nativos
+- sincroniza el proyecto Android
+
+---
+
+## 4. Gradle + Java
+
+Gradle es el sistema de build de Android.
+
+### Responsabilidades
+
+- Leer `build.gradle`
+- Descargar dependencias
+- Compilar código Java/Kotlin
+- Generar el APK final
+
+Java JDK es necesario porque Gradle y Android usan Java internamente para compilar el proyecto nativo.
+
+---
+
+# Flujo típico de desarrollo
+
+## Compilar la aplicación web
+
+```bash
+ionic build
+```
+
+---
+
+## Sincronizar con Android
+
+```bash
+npx cap sync android
+```
+
+---
+
+## Ejecutar en emulador/dispositivo
+
+```bash
+npx cap run android
+```
+
+---
+
+# Notificaciones locales
+
+Instalación del plugin:
+
+```bash
+npm install @capacitor/local-notifications
+```
+
+Sincronizar:
+
+```bash
+npx cap sync android
+```
+
+Ejemplo:
+
+```ts
+await LocalNotifications.schedule({
+  notifications: [
+    {
+      id: 1,
+      title: 'Nueva notificación 🚀',
+      body: 'Hola desde Ionic + Capacitor',
+      schedule: {
+        at: new Date(Date.now() + 1000)
+      }
+    }
+  ]<img width="1219" height="1053" alt="Captura de pantalla 2026-05-15 170930" src="https://github.com/user-attachments/assets/1dbded16-54a7-4c5d-a212-3428bed8a4a3" />
+
+});
+```
+
+---
+
+# Resultado final
+
+El resultado final es un:
+
+- APK
+- AAB
+
+que puede instalarse en:
+
+- emulador Android
+- dispositivo físico
+- Google Play Store
+
+
+
+## Botones importantes
+
+- El botón **Play ▶** ejecuta la aplicación.
+- Podés reiniciar o detener el emulador desde Android Studio.
+- El celular/emulador y la aplicación son cosas diferentes:
+  - El emulador puede iniciarse desde consola.
+  - La app se ejecuta desde el botón **Play ▶** de Android Studio.
+
+<div align="center">
+
+<table>
+<tr>
+<td align="center">
+<img width="475" alt="Captura 1" src="https://github.com/user-attachments/assets/7a62550b-fdf5-4c3e-991c-0af8ac5519bd" />
+</td>
+
+<td align="center">
+<img width="475" alt="Captura 2" src="https://github.com/user-attachments/assets/217b9834-a2d7-4f35-aaaf-327dd0048555" />
+</td>
+</tr>
+
+<tr>
+<td colspan="2" align="center">
+<img width="900" alt="Captura 3" src="https://github.com/user-attachments/assets/03f04559-9966-4e6d-b20a-c99bc891f626" />
+</td>
+</tr>
+</table>
+
+</div>
+
+
+
